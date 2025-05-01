@@ -11,11 +11,13 @@ class GameScreen(game: Game) : Screen(game) {
     private val chickenX = 500f
     private var chickenY = 1500f
     private val chickenSize = 100f
+    private val lanes = listOf(600f, 800f, 1000f, 1200f)
 
     private val cars = mutableListOf<Car>()
     private var timeSinceLastCar = 0f
     private var isGameOver = false
     private var score = 0
+    private var currentLane = lanes.size - 1
 
     init {
         paint.color = Color.YELLOW
@@ -24,20 +26,30 @@ class GameScreen(game: Game) : Screen(game) {
     override fun update(et: Float) {
         if (isGameOver) return
 
-        // Conversão correta do tempo (et estava muito pequeno)
-        val deltaTime = et * 1000f  // Convertendo para milissegundos
+        val deltaTime = et * 1000f
 
-        if (chickenY <= 0) {
-            score++
-            chickenY = 1500f
-            Car.increaseSpeed()
-            return
+        if (chickenY <= lanes[currentLane] - chickenSize) {
+            if (currentLane > 0) {
+                currentLane--
+            } else {
+                score++
+                if (score >= 5) {
+                    game.actualScreen = VictoryScreen(game, score)
+                    return
+                }
+                chickenY = 1500f
+                currentLane = lanes.size - 1
+                Car.increaseSpeed()
+                return
+            }
         }
 
         timeSinceLastCar += deltaTime
-        if (timeSinceLastCar > 300f) {  // 300ms entre carros
-            val lane = listOf(600f, 800f, 1000f, 1200f).random()
-            cars.add(Car(-200f, lane, Car.currentSpeed))
+        if (timeSinceLastCar > 800f) {
+            if (cars.size < lanes.size * 2) {
+                val laneIndex = Random.nextInt(lanes.size)
+                cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed))
+            }
             timeSinceLastCar = 0f
         }
 
@@ -45,8 +57,10 @@ class GameScreen(game: Game) : Screen(game) {
         while (iterator.hasNext()) {
             val car = iterator.next()
             car.update(deltaTime)
-            if (car.x > game.screenWidth + 200) iterator.remove()
-            if (car.collidesWith(chickenX, chickenY, chickenSize)) {
+
+            if (car.x > game.screenWidth + 200) {
+                iterator.remove()
+            } else if (car.collidesWith(chickenX, chickenY, chickenSize)) {
                 isGameOver = true
                 game.actualScreen = GameOverScreen(game, score)
                 return
@@ -59,12 +73,12 @@ class GameScreen(game: Game) : Screen(game) {
             c.drawColor(Color.DKGRAY)
 
             paint.color = Color.GRAY
-            c.drawRect(0f, 500f, c.width.toFloat(), 1500f, paint)
+            c.drawRect(0f, lanes.first() - 50f, c.width.toFloat(), lanes.last() + 150f, paint)
 
             paint.color = Color.WHITE
             paint.strokeWidth = 10f
-            for (i in 500..1500 step 200) {
-                c.drawLine(0f, i.toFloat(), c.width.toFloat(), i.toFloat(), paint)
+            lanes.forEach { lane ->
+                c.drawLine(0f, lane, c.width.toFloat(), lane, paint)
             }
 
             cars.forEach { it.draw(c) }
@@ -72,6 +86,7 @@ class GameScreen(game: Game) : Screen(game) {
             paint.color = Color.YELLOW
             c.drawRect(chickenX, chickenY, chickenX + chickenSize, chickenY + chickenSize, paint)
 
+            // Pontuação
             paint.color = Color.WHITE
             paint.textSize = 60f
             c.drawText("Pontos: $score", 50f, 100f, paint)
@@ -80,8 +95,11 @@ class GameScreen(game: Game) : Screen(game) {
 
     override fun handleEvent(event: Int, x: Float, y: Float) {
         if (event == MotionEvent.ACTION_DOWN && !isGameOver) {
-            chickenY -= 300f  // Movimento mais rápido
-            if (chickenY < 0) chickenY = 0f
+            chickenY -= 300f
+            // Limita até a primeira lane
+            if (chickenY < lanes[0] - chickenSize) {
+                chickenY = lanes[0] - chickenSize
+            }
         }
     }
 
@@ -95,15 +113,15 @@ class Car(var x: Float, val y: Float, private val speed: Float) {
     private val height = 100f
 
     companion object {
-        var currentSpeed = 15f  // Valor otimizado
+        var currentSpeed = 0.3f
         fun increaseSpeed() {
-            currentSpeed += 5f  // Incremento otimizado
-            if (currentSpeed > 30f) currentSpeed = 30f
+            currentSpeed += 0.03f
+            if (currentSpeed > 0.5f) currentSpeed = 0.5f
         }
     }
 
     fun update(deltaTime: Float) {
-        x += speed * (deltaTime / 16f)  // Fator de normalização
+        x += speed * deltaTime
     }
 
     fun draw(canvas: android.graphics.Canvas) {
@@ -111,16 +129,16 @@ class Car(var x: Float, val y: Float, private val speed: Float) {
             color = Color.RED
             style = android.graphics.Paint.Style.FILL
         }
-        canvas.drawRect(x, y, x + width, y + height, paint)
+        canvas.drawRect(x, y - height/2, x + width, y + height/2, paint)
 
         paint.color = Color.BLACK
-        canvas.drawRect(x + 20, y + 15, x + width - 20, y + height - 15, paint)
+        canvas.drawRect(x + 20, y - height/2 + 15, x + width - 20, y + height/2 - 15, paint)
     }
 
     fun collidesWith(cx: Float, cy: Float, size: Float): Boolean {
         return x < cx + size &&
                 x + width > cx &&
-                y < cy + size &&
-                y + height > cy
+                y - height/2 < cy + size &&
+                y + height/2 > cy
     }
 }
