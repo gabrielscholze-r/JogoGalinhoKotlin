@@ -33,7 +33,7 @@ class GameScreen(game: Game) : Screen(game) {
                 currentLane--
             } else {
                 score++
-                if (score >= 5) {
+                if (score >= 2) {
                     game.actualScreen = VictoryScreen(game, score)
                     return
                 }
@@ -45,7 +45,7 @@ class GameScreen(game: Game) : Screen(game) {
         }
 
         timeSinceLastCar += deltaTime
-        if (timeSinceLastCar > 800f) {
+        if (timeSinceLastCar > 1300f) {
             if (cars.size < lanes.size * 2) {
                 val laneIndex = Random.nextInt(lanes.size)
                 cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed))
