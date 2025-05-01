@@ -11,7 +11,9 @@ class GameScreen(game: Game) : Screen(game) {
     private val chickenX = 500f
     private var chickenY = 1500f
     private val chickenSize = 100f
-    private val lanes = listOf(600f, 800f, 1000f, 1200f)
+    private val lanes = List(10) { 600f + it * 100f }
+    private var isMoving = false
+    private val moveSpeed = 15f
 
     private val cars = mutableListOf<Car>()
     private var timeSinceLastCar = 0f
@@ -28,19 +30,22 @@ class GameScreen(game: Game) : Screen(game) {
 
         val deltaTime = et * 1000f
 
-        if (chickenY <= lanes[currentLane] - chickenSize) {
-            if (currentLane > 0) {
-                currentLane--
-            } else {
-                score++
-                if (score >= 2) {
-                    game.actualScreen = VictoryScreen(game, score)
-                    return
+        if (isMoving) {
+            chickenY -= moveSpeed
+            if (chickenY <= lanes[currentLane] - chickenSize/2) {
+                chickenY = lanes[currentLane] - chickenSize/2
+                isMoving = false
+
+                if (currentLane == 0) {
+                    score++
+                    if (score >= 2) {
+                        game.actualScreen = VictoryScreen(game, score)
+                        return
+                    }
+                    chickenY = lanes.last() + 100f
+                    currentLane = lanes.size - 1
+                    Car.increaseSpeed()
                 }
-                chickenY = 1500f
-                currentLane = lanes.size - 1
-                Car.increaseSpeed()
-                return
             }
         }
 
@@ -86,7 +91,6 @@ class GameScreen(game: Game) : Screen(game) {
             paint.color = Color.YELLOW
             c.drawRect(chickenX, chickenY, chickenX + chickenSize, chickenY + chickenSize, paint)
 
-            // Pontuação
             paint.color = Color.WHITE
             paint.textSize = 60f
             c.drawText("Pontos: $score", 50f, 100f, paint)
@@ -94,12 +98,9 @@ class GameScreen(game: Game) : Screen(game) {
     }
 
     override fun handleEvent(event: Int, x: Float, y: Float) {
-        if (event == MotionEvent.ACTION_DOWN && !isGameOver) {
-            chickenY -= 300f
-            // Limita até a primeira lane
-            if (chickenY < lanes[0] - chickenSize) {
-                chickenY = lanes[0] - chickenSize
-            }
+        if (event == MotionEvent.ACTION_DOWN && !isGameOver && !isMoving && currentLane > 0) {
+            currentLane--
+            isMoving = true
         }
     }
 
