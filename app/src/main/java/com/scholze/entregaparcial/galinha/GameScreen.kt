@@ -11,11 +11,12 @@ import kotlin.random.Random
 class GameScreen(game: Game) : Screen(game) {
     private val lanes = List(10) { 800f + it * 100f }
     private val chickenSize = 100f
+    private val startPositionOffset = 150f
 
-    private val chickenPosition = Vector2(500f, lanes.last() + 150f)
+    private val chickenPosition = Vector2(500f, lanes.last() + startPositionOffset)
     private var currentLane = lanes.lastIndex
     private val chickenVelocity = Vector2()
-    private var targetLaneY = lanes.last() + 150f
+    private var targetLaneY = lanes.last() + startPositionOffset
 
     private val cars = mutableListOf<Car>()
     private var timeSinceLastCar = 0f
@@ -26,7 +27,6 @@ class GameScreen(game: Game) : Screen(game) {
     private val jumpForce = -1000f
     private var isHit = false
     private var hitEffectTimer = 0f
-    private var gameStarted = false
 
     init {
         paint.color = Color.YELLOW
@@ -74,19 +74,15 @@ class GameScreen(game: Game) : Screen(game) {
         chickenPosition.y += chickenVelocity.y * et
 
         if ((chickenVelocity.y > 0 && chickenPosition.y >= targetLaneY) ||
-            (chickenVelocity.y < 0 && chickenPosition.y <= targetLaneY)) {
+            (chickenVelocity.y < 0 && chickenPosition.y <= targetLaneY)
+        ) {
             chickenPosition.y = targetLaneY
             chickenVelocity.y = 0f
             isJumping = false
-            if (targetLaneY == lanes.last() - chickenSize) {
-                gameStarted = true
-            }
         }
     }
 
     private fun updateCars(et: Float) {
-        if (!gameStarted) return
-
         timeSinceLastCar += et
 
         if (timeSinceLastCar > 1.5f) {
@@ -104,7 +100,12 @@ class GameScreen(game: Game) : Screen(game) {
 
             if (car.x > game.screenWidth + 200) {
                 iterator.remove()
-            } else if (!isHit && car.collidesWith(chickenPosition.x, chickenPosition.y, chickenSize)) {
+            } else if (!isHit && car.collidesWith(
+                    chickenPosition.x,
+                    chickenPosition.y,
+                    chickenSize
+                )
+            ) {
                 loseLife()
             }
         }
@@ -113,8 +114,11 @@ class GameScreen(game: Game) : Screen(game) {
     override fun handleEvent(event: Int, x: Float, y: Float) {
         if (event == MotionEvent.ACTION_DOWN && !isHit) {
             if (!isJumping) {
-                if (!gameStarted) {
-                    startGame()
+                if (currentLane == lanes.size) {
+                    currentLane = lanes.lastIndex
+                    targetLaneY = lanes.last()
+                    chickenVelocity.y = jumpForce
+                    isJumping = true
                 } else if (currentLane > 0) {
                     jumpToNextLane()
                 } else if (currentLane == 0) {
@@ -124,15 +128,9 @@ class GameScreen(game: Game) : Screen(game) {
         }
     }
 
-    private fun startGame() {
-        targetLaneY = lanes.last() - chickenSize
-        chickenVelocity.y = jumpForce
-        isJumping = true
-    }
-
     private fun jumpToNextLane() {
         currentLane--
-        targetLaneY = lanes[currentLane] - chickenSize
+        targetLaneY = lanes[currentLane]
         chickenVelocity.y = jumpForce
         isJumping = true
     }
@@ -145,11 +143,10 @@ class GameScreen(game: Game) : Screen(game) {
 
     private fun resetChickenPosition() {
         currentLane = lanes.lastIndex
-        chickenPosition.y = lanes.last() + 150f
-        targetLaneY = lanes.last() - chickenSize
+        chickenPosition.y = lanes.last() + startPositionOffset
+        targetLaneY = lanes.last() + startPositionOffset
         chickenVelocity.y = 0f
         isJumping = false
-        gameStarted = false
     }
 
     private fun loseLife() {
@@ -173,7 +170,7 @@ class GameScreen(game: Game) : Screen(game) {
             c.drawColor(if (isHit) Color.argb(100, 255, 0, 0) else Color.DKGRAY)
 
             paint.color = Color.GRAY
-            c.drawRect(0f, lanes.first() - 50f, c.width.toFloat(), lanes.last() + 150f, paint)
+            c.drawRect(0f, lanes.first() - 50f, c.width.toFloat(), lanes.last() + startPositionOffset + chickenSize, paint)
 
             paint.color = Color.WHITE
             paint.strokeWidth = 10f
