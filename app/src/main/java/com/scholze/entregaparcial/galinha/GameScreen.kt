@@ -4,58 +4,75 @@ import android.graphics.Color
 import android.view.MotionEvent
 import com.scholze.entregaparcial.Game
 import com.scholze.entregaparcial.Screen
+import com.scholze.entregaparcial.Vector2
 import kotlin.random.Random
-import kotlin.math.abs
-
 
 class GameScreen(game: Game) : Screen(game) {
-
-    private val chickenX = 500f
-    private var chickenY = 1800f
-    private val chickenSize = 100f
     private val lanes = List(10) { 800f + it * 100f }
-    private var isMoving = false
-    private val MOVE_SPEED = 800f
+    private val chickenSize = 100f
+
+    private val chickenPosition = Vector2(500f, lanes.last() + 150f)
+    private var currentLane = lanes.lastIndex
+    private val chickenVelocity = Vector2()
+    private var targetLaneY = lanes.last() + 150f
 
     private val cars = mutableListOf<Car>()
     private var timeSinceLastCar = 0f
-    private var isGameOver = false
+    private var lives = 3
     private var score = 0
-    private var currentLane = lanes.size
-    private var targetY = chickenY
+    private var isJumping = false
+    private val gravity = 1200f
+    private val jumpForce = -1000f
+    private var isHit = false
+    private var hitEffectTimer = 0f
+    private var gameStarted = false
 
     init {
         paint.color = Color.YELLOW
+        Car.resetSpeed()
     }
 
     override fun update(et: Float) {
-        if (isGameOver) return
-
-        if (isMoving) {
-            val direction = if (targetY > chickenY) 1 else -1
-            chickenY += direction * MOVE_SPEED * et
-
-            if (abs(chickenY - targetY) < 10f) {
-                chickenY = targetY
-                isMoving = false
-
-                if (currentLane == -1) {
-                    score++
-                    if (score >= 2) {
-                        game.actualScreen = VictoryScreen(game, score)
-                        return
-                    }
-                    resetChicken()
-                }
-            }
+        if (lives <= 0) {
+            game.actualScreen = GameOverScreen(game, score)
+            return
         }
 
+        updateChicken(et)
+        updateCars(et)
+        updateGameLogic()
+        updateEffects(et)
+    }
+
+    private fun updateChicken(et: Float) {
+        if (!isJumping) return
+
+        chickenVelocity.y += gravity * et
+        chickenPosition.y += chickenVelocity.y * et
+
+        if ((chickenVelocity.y > 0 && chickenPosition.y >= targetLaneY) ||
+            (chickenVelocity.y < 0 && chickenPosition.y <= targetLaneY)) {
+            chickenPosition.y = targetLaneY
+            chickenVelocity.y = 0f
+            isJumping = false
+            if (targetLaneY == lanes.last() - chickenSize) {
+                gameStarted = true
+            }
+        }
+    }
+
+    private fun updateCars(et: Float) {
+        if (!gameStarted) return
+
         timeSinceLastCar += et
-        if (timeSinceLastCar > 1.3f) {
-            if (cars.size < lanes.size * 2) {
-                val laneIndex = Random.nextInt(lanes.size)
+
+        if (timeSinceLastCar > 1.5f) {
+            val laneIndex = Random.nextInt(lanes.size)
+
+            if (cars.count { it.y == lanes[laneIndex] } < 1) {
                 cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed))
             }
+
             timeSinceLastCar = 0f
         }
 
@@ -66,92 +83,106 @@ class GameScreen(game: Game) : Screen(game) {
 
             if (car.x > game.screenWidth + 200) {
                 iterator.remove()
-            } else if (car.collidesWith(chickenX, chickenY, chickenSize)) {
-                isGameOver = true
-                game.actualScreen = GameOverScreen(game, score)
-                return
+            } else if (!isHit && car.collidesWith(chickenPosition.x, chickenPosition.y, chickenSize)) {
+                loseLife()
             }
         }
     }
 
-    private fun resetChicken() {
-        chickenY = 1800f
-        currentLane = lanes.size
+    override fun handleEvent(event: Int, x: Float, y: Float) {
+        if (event == MotionEvent.ACTION_DOWN && !isHit) {
+            if (!isJumping) {
+                if (!gameStarted) {
+                    targetLaneY = lanes.last() - chickenSize
+                    chickenVelocity.y = jumpForce
+                    isJumping = true
+                } else if (currentLane > 0) {
+                    currentLane--
+                    targetLaneY = lanes[currentLane] - chickenSize
+                    chickenVelocity.y = jumpForce
+                    isJumping = true
+                } else if (currentLane == 0) {
+                    completeLevel()
+                }
+            }
+        }
+    }
+
+    private fun updateGameLogic() {
+        if (score >= 5 && currentLane == 0 && !isJumping) {
+            game.actualScreen = VictoryScreen(game, score)
+        }
+    }
+
+    private fun updateEffects(et: Float) {
+        if (!isHit) return
+
+        hitEffectTimer += et
+        if (hitEffectTimer > 0.5f) {
+            isHit = false
+            hitEffectTimer = 0f
+        }
+    }
+
+    private fun completeLevel() {
+        score++
         Car.increaseSpeed()
+
+        currentLane = lanes.lastIndex
+        chickenPosition.y = lanes.last() + 150f
+        targetLaneY = lanes.last() - chickenSize
+        chickenVelocity.y = 0f
+        isJumping = false
+        gameStarted = false
+    }
+
+    private fun loseLife() {
+        lives--
+        isHit = true
+        hitEffectTimer = 0f
+
+        currentLane = lanes.lastIndex
+        chickenPosition.y = lanes.last() + 150f
+        targetLaneY = lanes.last() - chickenSize
+        chickenVelocity.y = 0f
+        isJumping = false
+        gameStarted = false
     }
 
     override fun draw() {
         canvas?.let { c ->
-            c.drawColor(Color.DKGRAY)
+            c.drawColor(if (isHit) Color.argb(100, 255, 0, 0) else Color.DKGRAY)
 
             paint.color = Color.GRAY
             c.drawRect(0f, lanes.first() - 50f, c.width.toFloat(), lanes.last() + 150f, paint)
 
             paint.color = Color.WHITE
             paint.strokeWidth = 10f
-            lanes.forEach { lane ->
-                c.drawLine(0f, lane, c.width.toFloat(), lane, paint)
-            }
+            lanes.forEach { lane -> c.drawLine(0f, lane, c.width.toFloat(), lane, paint) }
 
             cars.forEach { it.draw(c) }
 
-            paint.color = Color.YELLOW
-            c.drawRect(chickenX, chickenY, chickenX + chickenSize, chickenY + chickenSize, paint)
+            paint.color = when {
+                isHit -> Color.RED
+                isJumping -> Color.argb(255, 255, 255, 0)
+                else -> Color.YELLOW
+            }
+            c.drawRect(
+                chickenPosition.x,
+                chickenPosition.y,
+                chickenPosition.x + chickenSize,
+                chickenPosition.y + chickenSize,
+                paint
+            )
 
             paint.color = Color.WHITE
             paint.textSize = 60f
             c.drawText("Pontos: $score", 50f, 100f, paint)
-        }
-    }
-
-    override fun handleEvent(event: Int, x: Float, y: Float) {
-        if (event == MotionEvent.ACTION_DOWN && !isGameOver && !isMoving) {
-            currentLane--
-            targetY = if (currentLane >= 0) {
-                lanes[currentLane] - chickenSize / 2
-            } else {
-                lanes[0] - 150f
-            }
-            isMoving = true
+            c.drawText("Vidas: $lives", 50f, 180f, paint)
         }
     }
 
     override fun onPause() {}
     override fun onResume() {}
     override fun backPressed() {}
-}
-
-class Car(var x: Float, val y: Float, private val speed: Float) {
-    private val width = 200f
-    private val height = 100f
-
-    companion object {
-        var currentSpeed = 300f
-        fun increaseSpeed() {
-            currentSpeed += 30f
-            if (currentSpeed > 500f) currentSpeed = 500f
-        }
-    }
-
-    fun update(deltaTime: Float) {
-        x += currentSpeed * deltaTime
-    }
-
-    fun draw(canvas: android.graphics.Canvas) {
-        val paint = android.graphics.Paint().apply {
-            color = Color.RED
-            style = android.graphics.Paint.Style.FILL
-        }
-        canvas.drawRect(x, y - height / 2, x + width, y + height / 2, paint)
-
-        paint.color = Color.BLACK
-        canvas.drawRect(x + 20, y - height / 2 + 15, x + width - 20, y + height / 2 - 15, paint)
-    }
-
-    fun collidesWith(cx: Float, cy: Float, size: Float): Boolean {
-        return x < cx + size &&
-                x + width > cx &&
-                y - height / 2 < cy + size &&
-                y + height / 2 > cy
-    }
 }

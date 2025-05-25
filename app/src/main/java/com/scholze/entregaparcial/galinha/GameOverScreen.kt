@@ -6,10 +6,9 @@ import com.scholze.entregaparcial.Game
 import com.scholze.entregaparcial.Screen
 
 class GameOverScreen(game: Game, private val score: Int) : Screen(game) {
-
     init {
         paint.color = Color.WHITE
-        paint.textSize = 100f
+        paint.textSize = 80f
         paint.textAlign = android.graphics.Paint.Align.CENTER
     }
 
@@ -17,14 +16,14 @@ class GameOverScreen(game: Game, private val score: Int) : Screen(game) {
 
     override fun draw() {
         canvas?.let {
-            it.drawColor(Color.BLACK)
-            it.drawText("Game Over!", it.width / 2f, it.height / 2f - 100, paint)
+            it.drawColor(Color.argb(200, 0, 0, 0))
+            it.drawText("Game Over", it.width / 2f, it.height / 2f - 100, paint)
 
             paint.textSize = 60f
             it.drawText("Pontuação: $score", it.width / 2f, it.height / 2f, paint)
 
             paint.textSize = 40f
-            it.drawText("Toque para tentar novamente", it.width / 2f, it.height / 2f + 150, paint)
+            it.drawText("Toque para jogar novamente", it.width / 2f, it.height / 2f + 150, paint)
         }
     }
 
