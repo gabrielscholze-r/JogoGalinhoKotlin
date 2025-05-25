@@ -87,8 +87,8 @@ class GameScreen(game: Game) : Screen(game) {
 
         if (timeSinceLastCar > 1.5f) {
             val laneIndex = Random.nextInt(lanes.size)
-            if (cars.count { it.y == lanes[laneIndex] } < 1) {
-                cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed))
+            if (cars.none { it.position.y == lanes[laneIndex] && it.position.x < game.screenWidth }) {
+                cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed, game.screenWidth))
             }
             timeSinceLastCar = 0f
         }
@@ -98,7 +98,7 @@ class GameScreen(game: Game) : Screen(game) {
             val car = iterator.next()
             car.update(et)
 
-            if (car.x > game.screenWidth + 200) {
+            if (car.position.x > game.screenWidth + 250f) {
                 iterator.remove()
             } else if (!isHit && car.collidesWith(
                     chickenPosition.x,
