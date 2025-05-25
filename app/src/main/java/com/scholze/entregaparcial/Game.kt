@@ -7,7 +7,6 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 
 class Game(context: Context) : SurfaceView(context), SurfaceHolder.Callback, Runnable {
-
     var screenWidth = 0
     var screenHeight = 0
     var actualScreen: Screen = FirstScreen(this)

@@ -1,5 +1,6 @@
 package com.scholze.entregaparcial.galinha
 
+import android.content.Context
 import android.graphics.Color
 import android.view.MotionEvent
 import com.scholze.entregaparcial.Game
@@ -34,14 +35,36 @@ class GameScreen(game: Game) : Screen(game) {
 
     override fun update(et: Float) {
         if (lives <= 0) {
-            game.actualScreen = GameOverScreen(game, score)
+            checkHighScoreAndShowScreen()
             return
         }
 
         updateChicken(et)
         updateCars(et)
-        updateGameLogic()
         updateEffects(et)
+    }
+
+    private fun checkHighScoreAndShowScreen() {
+        val highScore = getHighScore()
+        if (score > highScore) {
+            saveHighScore(score)
+            game.actualScreen = VictoryScreen(game, score, true)
+        } else {
+            game.actualScreen = GameOverScreen(game, score)
+        }
+    }
+
+    private fun saveHighScore(newScore: Int) {
+        val sharedPref = game.context.getSharedPreferences("GamePrefs", Context.MODE_PRIVATE)
+        with(sharedPref.edit()) {
+            putInt("high_score", newScore)
+            apply()
+        }
+    }
+
+    private fun getHighScore(): Int {
+        val sharedPref = game.context.getSharedPreferences("GamePrefs", Context.MODE_PRIVATE)
+        return sharedPref.getInt("high_score", 0)
     }
 
     private fun updateChicken(et: Float) {
@@ -68,11 +91,9 @@ class GameScreen(game: Game) : Screen(game) {
 
         if (timeSinceLastCar > 1.5f) {
             val laneIndex = Random.nextInt(lanes.size)
-
             if (cars.count { it.y == lanes[laneIndex] } < 1) {
                 cars.add(Car(-200f, lanes[laneIndex], Car.currentSpeed))
             }
-
             timeSinceLastCar = 0f
         }
 
@@ -93,14 +114,9 @@ class GameScreen(game: Game) : Screen(game) {
         if (event == MotionEvent.ACTION_DOWN && !isHit) {
             if (!isJumping) {
                 if (!gameStarted) {
-                    targetLaneY = lanes.last() - chickenSize
-                    chickenVelocity.y = jumpForce
-                    isJumping = true
+                    startGame()
                 } else if (currentLane > 0) {
-                    currentLane--
-                    targetLaneY = lanes[currentLane] - chickenSize
-                    chickenVelocity.y = jumpForce
-                    isJumping = true
+                    jumpToNextLane()
                 } else if (currentLane == 0) {
                     completeLevel()
                 }
@@ -108,26 +124,26 @@ class GameScreen(game: Game) : Screen(game) {
         }
     }
 
-    private fun updateGameLogic() {
-        if (score >= 5 && currentLane == 0 && !isJumping) {
-            game.actualScreen = VictoryScreen(game, score)
-        }
+    private fun startGame() {
+        targetLaneY = lanes.last() - chickenSize
+        chickenVelocity.y = jumpForce
+        isJumping = true
     }
 
-    private fun updateEffects(et: Float) {
-        if (!isHit) return
-
-        hitEffectTimer += et
-        if (hitEffectTimer > 0.5f) {
-            isHit = false
-            hitEffectTimer = 0f
-        }
+    private fun jumpToNextLane() {
+        currentLane--
+        targetLaneY = lanes[currentLane] - chickenSize
+        chickenVelocity.y = jumpForce
+        isJumping = true
     }
 
     private fun completeLevel() {
         score++
         Car.increaseSpeed()
+        resetChickenPosition()
+    }
 
+    private fun resetChickenPosition() {
         currentLane = lanes.lastIndex
         chickenPosition.y = lanes.last() + 150f
         targetLaneY = lanes.last() - chickenSize
@@ -140,13 +156,16 @@ class GameScreen(game: Game) : Screen(game) {
         lives--
         isHit = true
         hitEffectTimer = 0f
+        resetChickenPosition()
+    }
 
-        currentLane = lanes.lastIndex
-        chickenPosition.y = lanes.last() + 150f
-        targetLaneY = lanes.last() - chickenSize
-        chickenVelocity.y = 0f
-        isJumping = false
-        gameStarted = false
+    private fun updateEffects(et: Float) {
+        if (!isHit) return
+        hitEffectTimer += et
+        if (hitEffectTimer > 0.5f) {
+            isHit = false
+            hitEffectTimer = 0f
+        }
     }
 
     override fun draw() {
@@ -179,6 +198,7 @@ class GameScreen(game: Game) : Screen(game) {
             paint.textSize = 60f
             c.drawText("Pontos: $score", 50f, 100f, paint)
             c.drawText("Vidas: $lives", 50f, 180f, paint)
+            c.drawText("Recorde: ${getHighScore()}", 50f, 260f, paint)
         }
     }
 
